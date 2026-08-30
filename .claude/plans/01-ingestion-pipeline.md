@@ -468,7 +468,8 @@ no notion of the current time. Anything time-like comes from the data.
 
 Each stage is a pure function with an explicit input and output type. The
 runner in `src/stages/run.ts` composes them. No stage reads the clock, the
-network (except §7.2b), or a random source.
+network, or a random source — see §7.2b on why there is no network stage in
+this delivery.
 
 ```
 discover → read → canonicalise → tokenise → validate → observe → resolve → derive → index
@@ -508,31 +509,22 @@ rest is the body. Emit one `RawRecord` per message, not per file.
 > stores them as text. Do not call `.toISOString()` on them; pass the string
 > through and let §7.3 parse it.
 
-### 7.2b Live API sources — record and replay
+### 7.2b Live API sources — deferred, not built
 
-Live APIs are a source like any other, but a network call is the natural enemy
-of a pure ingest. Resolve it with **record-and-replay**:
+`CANDIDATE_README.md`, `.env.example` and `docker-compose.yml` all confirm the
+delivered bundle is files-only: "no servers, no accounts, nothing to set up."
+There is no endpoint to call. Building a record-and-replay adapter
+(`ApiSourceAdapter`, snapshot directory, `--refresh`) for a source that does
+not exist would spend hours §14 doesn't have to spare, against the Part
+B pipeline and the query interface, which carry more of the score and
+currently have no plan at all.
 
-```
-discover() → fetch → snapshots/<sourceId>/<sha256(response)>.json → read()
-                            ↑                                          ↑
-                      only with --refresh                     always, offline
-```
-
-- `bun run src/cli.ts ingest --refresh` performs the fetches and writes
-  snapshots. Every other invocation reads snapshots only.
-- A snapshot file is immutable and content-addressed; `snapshots/<sourceId>/index.json`
-  maps `{ endpoint, page, fetchedAt, hash }` in sorted order and is the only
-  file that records a fetch time. It is **not** an ingestion input.
-- Consequences, all of which you want: reruns work offline, the demo cannot be
-  broken by a flaky upstream, and you retain a permanent record of exactly what
-  the API returned when the client insists their data said something else.
-- Implement `ApiSourceAdapter extends SourceAdapter` with `refresh(): Promise<void>`.
-  Pagination must be deterministic (sort by the API's stable key, not by
-  arrival). Retries are allowed inside `refresh`, never inside `read`.
-
-Until real endpoints exist, ship the interface and one adapter reading a
-snapshot directory. No stubs that pretend to fetch.
+The `SourceAdapter` interface in §5 (`discover` / `read` / `observe`) already
+generalises to any source, network or file, with no changes needed. If a live
+API does appear (the hour-7 surprise file, per the challenge brief, is still
+a *file* handed over live — not an endpoint), it plugs in as one more adapter
+behind that same interface. Do not build the fetch-and-snapshot machinery
+speculatively; build it only if an actual endpoint shows up.
 
 ### 7.3 `canonicalise`
 
@@ -871,7 +863,19 @@ over time; recency decides within an authority tier).
 | `vehicle.home_hub` | fleet_master | — | AUTHORITATIVE | only source |
 | `vehicle.odometer_km` | maintenance_log | emails | LATEST | `thread_22`: *"the workshop odometer photo is the reference, not the yard check."* |
 | `driver.joining_date` | drivers_roster | — | AUTHORITATIVE | only source |
-| `client.sla_hours` | interview | emails | LATEST | dispatcher's operating rule overrides the contract |
+
+**`client.sla_hours` is deliberately not in this ladder.** The real rule —
+*"Shakti is 36 hours no matter what the paper says"* — comes from
+`dispatcher_interview.txt` line 54, one of only three rules Rajender names as
+too expensive to learn by making the mistake. But §7.6 emits **zero**
+observations from the interview (text only, no factual claims), and §4.7
+states ingestion does not parse rules. A precedence row naming "interview" as
+rank 1 for a field ingestion structurally cannot populate would be dead
+config, not a decision. SLA-hours resolution belongs to `rules/rules.yaml` —
+a human transcribes it from the interview as part of the later rules-engine
+plan, and the decision pipeline consults that file directly, citing the same
+transcript line. Ingestion's job here is only to make the interview
+line citable via `text_units`, which §7.9 already does.
 
 **Within `fleet_master`, for the 18 duplicate pairs**, the tie-break order is:
 
@@ -920,7 +924,7 @@ but it must make it possible. These are hard obligations on this stage:
 
 | Requirement | Where it is satisfied |
 |---|---|
-| Ingest live APIs and the static corpus into one store | §7.2 / §7.2b, one adapter interface for both |
+| Ingest live APIs and the static corpus into one store | §7.2, one adapter interface covers both; §7.2b records why no live-API adapter exists in this delivery |
 | Unified, entity-resolved | §7.7, derived keys, no fuzzy matching |
 | Personal data masked **at ingestion** | §9, tokenise before the first write |
 | Same vehicle in multiple formats | §8.2, 172 spellings → 93 vehicles |
@@ -1002,7 +1006,7 @@ Verify each before declaring ingestion done:
 
 ```
 $ bun run src/cli.ts inspect vehicle RJ43DD3546
-  year          2017        [fleet_master.csv row:41]
+  year          2017        [fleet_master.csv row:2]
   conflict      2021        [emails/thread_21_internal_yearconflict.txt:msg:1]
                 rejected by precedence: vehicle.year — fleet_master outranks emails
 ```
