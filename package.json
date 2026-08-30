@@ -6,7 +6,7 @@
   "engines": { "bun": ">=1.1.0" },
   "scripts": {
     "cli": "bun run src/cli.ts",
-    "ingest": "bun run src/cli.ts ingest",
+    "ingest": "bun run src/run-ingest.ts",
     "verify": "bun run src/cli.ts verify",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
