@@ -1,0 +1,92 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Meridian Dispatch
+#
+# WHY THERE IS NO DATABASE SERVICE HERE
+#
+# The store is SQLite, embedded in the application process via `bun:sqlite`.
+# It is a file under ./state, not a server. That is a deliberate choice:
+#
+#   * The brief requires the whole system to start on a clean machine with one
+#     documented command. Every additional service is another way for that to
+#     fail on the evaluator's laptop.
+#   * "State survives between runs" is satisfied by a file on disk, with no
+#     connection strings, no healthchecks, no wait-for-ready races.
+#   * SQLite has everything the design depends on: ON CONFLICT DO NOTHING,
+#     partial unique indexes, window functions, and FTS5 full-text search.
+#   * Nothing here needs concurrent writers. It is one process over one queue.
+#
+# A Postgres service is defined below under the `postgres` profile. It does NOT
+# start by default and the application does not use it. It exists so the
+# migration path is visible, not because it is needed.
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose build
+#   docker compose run --rm meridian ingest
+#   docker compose run --rm meridian run
+#   docker compose run --rm meridian verify
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: meridian
+
+services:
+  meridian:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: meridian-dispatch:local
+    working_dir: /app
+    environment:
+      TZ: Asia/Kolkata
+      DATA_ROOT: /app/data
+      STATE_DIR: /app/state
+      OUTPUT_DIR: /app/outputs
+      AUDIT_DIR: /app/audit
+      CACHE_DIR: /app/cache
+      # Must be stable across runs or PII tokens change and re-runs stop
+      # being byte-identical. Fails loudly if unset.
+      MERIDIAN_PII_SALT: ${MERIDIAN_PII_SALT:?set MERIDIAN_PII_SALT in .env}
+      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+    volumes:
+      # The client bundle currently sits at the repo root, so the repo root is
+      # mounted read-only as the data root. If the input files are later moved
+      # into ./data, change this line to  ./data:/app/data:ro
+      - ./:/app/data:ro
+      - ./state:/app/state
+      - ./outputs:/app/outputs
+      - ./audit:/app/audit
+      - ./cache:/app/cache
+      - ./rules:/app/rules:ro
+    # The approval gate prompts a human on stdin.
+    stdin_open: true
+    tty: true
+    command: ["run"]
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # OPT-IN ONLY. Not started by default; the application does not read it.
+  # Start with:  docker compose --profile postgres up -d postgres
+  # Only worth switching to if the system ever needs concurrent writers or a
+  # store larger than a single machine. Neither is true today.
+  # ───────────────────────────────────────────────────────────────────────────
+  postgres:
+    profiles: ["postgres"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: meridian
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-meridian}
+      POSTGRES_DB: meridian
+      TZ: Asia/Kolkata
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meridian -d meridian"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

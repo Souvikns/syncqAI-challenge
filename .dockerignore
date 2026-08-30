@@ -1,0 +1,8 @@
+node_modules
+state
+outputs
+audit
+.verify
+.git
+.env
+*.log
