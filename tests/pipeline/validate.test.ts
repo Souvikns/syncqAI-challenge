@@ -72,6 +72,15 @@ describe('validateTickets', () => {
     db.close();
   });
 
+  test('raises an alert for every quarantined ticket - never silently dropped', () => {
+    const db = openActionsDb(tempDbPath());
+    validateTickets(db, 'tickets.json', knownDriverIds());
+
+    expect(row(db, "SELECT COUNT(*) as n FROM alerts WHERE kind = 'QUARANTINED'").n).toBe(2);
+    expect(row(db, "SELECT COUNT(*) as n FROM alerts WHERE kind = 'QUARANTINED' AND subject = 'TKT-9101'").n).toBe(1);
+    db.close();
+  });
+
   test('a second run writes no new audit rows - audit.jsonl must stay byte-identical across reruns', () => {
     const db = openActionsDb(tempDbPath());
     const drivers = knownDriverIds();

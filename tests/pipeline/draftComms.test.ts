@@ -58,7 +58,9 @@ describe('draftComms', () => {
     const pending = row(actionsDb, "SELECT * FROM comms_pending WHERE ticket_id = 'TKT-0027'");
     expect(pending.recipient).toBe('dispatch@shakticement.example.in');
     expect(pending.body.length).toBeGreaterThan(0);
-    expect(JSON.parse(pending.context).ticketId).toBe('TKT-0027');
+    const context = JSON.parse(pending.context);
+    expect(context.ticketId).toBe('TKT-0027');
+    expect(Array.isArray(context.citations)).toBe(true);
     expect(detectPii(pending.body)).toEqual([]);
 
     contextDb.close();

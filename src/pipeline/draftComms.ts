@@ -11,6 +11,7 @@ import type { EnrichedTicket } from './enrich';
 import { findRule, type RuleContext } from './rules';
 import { monthInSet, routeTouchesHubs } from './seasons';
 import type { Selection } from './selectVehicle';
+import { decisionCitations } from './workOrder';
 
 function recipientFor(clientKey: string): string {
   const aliases = CLIENT_ALIASES[clientKey];
@@ -72,6 +73,9 @@ export function draftComms(actionsDb: Database, enriched: EnrichedTicket, select
     actionCode: selection.actionCode,
     replacementVehicleKey: selection.replacementVehicleKey,
     clientKey: enriched.clientKey,
+    // The same evidence the work order cites - README requires the approver
+    // see "the full context and citations", not just a plain-English summary.
+    citations: decisionCitations(enriched, selection, ctx),
   };
 
   const messageId = sha256Hex('comms' + enriched.ticket.ticketId);

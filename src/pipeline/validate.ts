@@ -3,6 +3,7 @@
 
 import type { Database } from 'bun:sqlite';
 import { readFileSync } from 'node:fs';
+import { raiseAlert } from '../ingestion/shared';
 import { canonicalJson, normalizePlate, parseDate, sha256Hex, toInt } from '../utils';
 import { aliasTicketFields, buildTicketSchema, quarantineReasonsFrom, type QuarantineReason } from './ticket';
 import { writeAuditRecord } from './audit';
@@ -78,6 +79,12 @@ export function validateTickets(db: Database, ticketsPath: string, knownDriverId
     if (!result.success) {
       const reasons = quarantineReasonsFrom(result.error.issues);
       quarantineTicket(db, { ticketId, locator, payloadHash, reasons });
+      raiseAlert(
+        db,
+        'QUARANTINED',
+        ticketId ?? locator,
+        reasons.map((r) => `${r.field}:${r.code}`).sort().join(', '),
+      );
       writeAuditRecord(db, {
         ticketId: ticketId ?? locator,
         step: 'VALIDATE',
