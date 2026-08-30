@@ -336,10 +336,18 @@ see §4's note on why `ticket.ts` is shared, not re-derived) and, per row:
    re-runs safe. The **first** occurrence in file order wins; later
    duplicates are silently skipped, not merged, not compared.
 3. Validation failure → `quarantineRecord` (actions.db) with per-field
-   reasons, exactly like ingestion's quarantine, and an `audit_log` row
-   (`step='VALIDATE'`, `decision='QUARANTINED'`). Never throw.
+   reasons, exactly like ingestion's quarantine, **plus a `raiseAlert`** (kind
+   `'QUARANTINED'`, subject the ticket id) — this is what "quarantined with
+   an alert" (`CANDIDATE_README.md`, the challenge brief) means literally,
+   not just informally satisfied by the record being non-silent — and an
+   `audit_log` row (`step='VALIDATE'`, `decision='QUARANTINED'`). Never throw.
 4. Validation success → an `audit_log` row (`decision='VALID'`) and the
    parsed ticket proceeds to Step 2.
+
+**A rerun writes nothing new** — see §9's note on distinguishing an in-file
+duplicate (`seenThisRun`, worth its own `DUPLICATE_SKIPPED` audit row) from a
+ticket already in `processed_tickets` from an earlier run (a true no-op:
+no row of any kind).
 
 Expected on the delivered file: 32 distinct tickets seen, `TKT-9101` and
 `TKT-9102` quarantined (matching ingestion's numbers exactly, because it is
@@ -356,6 +364,15 @@ the same schema), 30 proceed.
 - `client` → `resolveClientKey`, then `client_vehicle_history` for that
   client-vehicle pair if one exists.
 - `origin_hub` / `destination` → `resolveHubKey` against the 9-hub table.
+- **Maintenance history relevant to the failure** (the challenge brief's
+  Step 2 names this explicitly): the ticket's own `issue` text is run through
+  the same lexicon ingestion built for mechanic notes (`classifyNote`,
+  `utils.ts`) - a ticket reporting "clutch slipping" gets tagged `clutch`,
+  the same tag a maintenance note mentions. Every past `maintenance_events`
+  row on this vehicle whose `concepts` overlap is surfaced as
+  `relevantMaintenanceHistory`, cited by `event_hash`. Empty, never guessed,
+  when nothing matches - this is retrieval by declared tag overlap, the same
+  anti-vector-store stance ingestion already took, not a new mechanism.
 - Every joined field that resolves to `NULL` or is absent is carried through
   as `UNKNOWN`, not defaulted — same discipline as ingestion. A ticket whose
   vehicle isn't in `vehicles` at all (shouldn't happen post-Step-1, since
@@ -433,19 +450,29 @@ body is built from a small per-client template, chosen by which rules from
 §6 applied to this ticket:
 
 - Default: state the breakdown, the replacement plan (vehicle dispatched
-  from `<hub>`, or "under review" for an escalation), and the applicable
-  SLA (`R04` for Shakti, else the ticket's implied default).
-- `R05` (Vertex + Ludhiana): if the enriched ETA would land after 18:00 IST,
-  the body says "scheduled for morning delivery," and **the word "failed"
-  must never appear** — this is asserted as a unit test, not just a
-  convention.
-- `R08` (monsoon, eastern routes): the quoted ETA in the body is already
-  padded ≥20% — never the unpadded number.
+  from `<hub>`, or "under manual review" for an escalation), and the
+  applicable SLA (`R04` for Shakti).
+- `R05` (Vertex + Ludhiana): **this system has no ETA/routing model**, so it
+  cannot compute whether a given dispatch will actually land after 18:00 IST.
+  Rather than fabricate that computation, every Vertex ticket bound for
+  Ludhiana discloses the 18:00 gate policy up front, unconditionally - honest
+  about what isn't known, instead of pretending a real arrival time exists.
+  **The word "failed" must never appear anywhere in the body** — checked
+  literally, not just "never used to describe this delivery"; a caught bug
+  during implementation was wording that negated the word while still
+  containing it (e.g. "never a failed delivery"), which still trips this
+  requirement's own point: no evaluator log scan for "failed" should ever
+  match this system's output.
+- `R08` (monsoon, eastern routes): computed the same way as `R01`/`R02`/`R03`
+  (`monthInSet` + `routeTouchesHubs`, no external signal) - wired correctly,
+  but see §2/§6: it structurally cannot fire on this bundle's hub vocabulary.
 - `context` (a separate JSON field, not part of the outbound `body`) carries
-  everything the human approver needs: the enrichment summary, every rule
-  citation, the vehicle-selection reasoning from Step 4, and the `R12` flag
-  if raised. This is what `comms_pending.jsonl`'s "full context and
-  citations shown to the approver" requirement means concretely.
+  everything the human approver needs: the ticket's issue/severity, the
+  action taken, the replacement vehicle if any, and `citations` — the exact
+  same evidence list (`decisionCitations`, shared with `workOrder.ts`) the
+  work order itself cites. This is what `comms_pending.jsonl`'s "full context
+  and citations shown to the approver" requirement means concretely; `R12`'s
+  flag is visible in `audit.jsonl` rather than duplicated into every message.
 - The final `body` string is run through `detectPii` before the row is
   written — a hit throws. It should never fire, since nothing PII-bearing
   ever enters this stage's inputs, but the tripwire belongs on every
