@@ -140,7 +140,7 @@ export function enrichTicket(contextDb: Database, actionsDb: Database, ticket: P
     step: 'ENRICH',
     decision: `vehicle:${vehicle?.key ?? 'UNKNOWN'};driver:${driver?.driverId ?? 'UNKNOWN'};client:${clientKey}`,
     ruleId: null,
-    citations: [...vehicleCitations(vehicle), ...relevantMaintenanceHistory.map((e) => e.eventHash)],
+    citations: [...new Set([...vehicleCitations(vehicle), ...relevantMaintenanceHistory.map((e) => e.eventHash)])],
     decidedBy: 'pipeline',
   });
 

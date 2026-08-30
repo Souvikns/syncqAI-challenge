@@ -65,16 +65,25 @@ export function buildTicketSchema(knownDriverIds: ReadonlySet<string>) {
     })
     .passthrough()
     .superRefine((fields, ctx) => {
-      const required = (field: 'ticket_id' | 'origin_hub' | 'km_from_origin_hub' | 'destination' | 'issue' | 'severity') => {
+      const required = (field: 'ticket_id' | 'origin_hub' | 'destination' | 'issue' | 'severity') => {
         if (!fields[field]) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [field], params: { code: 'MISSING' } });
       };
 
       required('ticket_id');
       required('origin_hub');
-      required('km_from_origin_hub');
       required('destination');
       required('issue');
       required('severity');
+
+      if (!fields.km_from_origin_hub) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['km_from_origin_hub'], params: { code: 'MISSING' } });
+      } else if (!Number.isFinite(Number(fields.km_from_origin_hub))) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['km_from_origin_hub'],
+          params: { code: 'NOT_NUMERIC', detail: fields.km_from_origin_hub },
+        });
+      }
 
       if (!fields.created_at) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['created_at'], params: { code: 'MISSING' } });

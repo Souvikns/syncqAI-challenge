@@ -1,4 +1,7 @@
 import { describe, test, expect } from 'bun:test';
+import { writeFileSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { openContextDb } from '../../src/ingest';
 import { ingestDriversRoster } from '../../src/ingestion/drivers';
 import { openActionsDb } from '../../src/actions';
@@ -78,6 +81,36 @@ describe('validateTickets', () => {
 
     expect(row(db, "SELECT COUNT(*) as n FROM alerts WHERE kind = 'QUARANTINED'").n).toBe(2);
     expect(row(db, "SELECT COUNT(*) as n FROM alerts WHERE kind = 'QUARANTINED' AND subject = 'TKT-9101'").n).toBe(1);
+    db.close();
+  });
+
+  test('quarantines a non-numeric km_from_origin_hub instead of silently treating it as 0', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'meridian-surprise-'));
+    const path = join(dir, 'tickets.json');
+    writeFileSync(
+      path,
+      JSON.stringify([
+        {
+          ticket_id: 'TKT-BAD-KM',
+          created_at: '2026-08-11T19:00:00',
+          vehicle: 'UP-40-IM-3144',
+          driver_id: 'DRV-020',
+          origin_hub: 'Lucknow',
+          km_from_origin_hub: 'twenty',
+          destination: 'Lucknow',
+          issue: 'fuel line leak',
+          severity: 'HIGH',
+        },
+      ]),
+    );
+
+    const db = openActionsDb(tempDbPath());
+    const tickets = validateTickets(db, path, knownDriverIds());
+
+    expect(tickets).toHaveLength(0);
+    const q = row(db, "SELECT reasons FROM quarantine WHERE ticket_id = 'TKT-BAD-KM'");
+    const reasons = JSON.parse(q.reasons) as { field: string; code: string }[];
+    expect(reasons.find((r) => r.field === 'km_from_origin_hub')?.code).toBe('NOT_NUMERIC');
     db.close();
   });
 
