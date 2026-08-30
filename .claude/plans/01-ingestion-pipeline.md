@@ -18,8 +18,9 @@ not adjust the expected value. If the spec is genuinely ambiguous, leave a
 `// SPEC-GAP: <question>` comment and report it rather than guessing.
 
 Scope of this plan is **ingestion only**: source bytes to a queryable
-`context.db`. The decision pipeline, rules engine, outbox and approval gate are
-separate plans. Do not build them here.
+`context.db`. The query interface (`02-query-interface.md`) and the decision
+pipeline, rules engine, outbox and approval gate (`03-decision-pipeline.md`)
+are separate plans. Do not build them here.
 
 ---
 
@@ -875,7 +876,9 @@ config, not a decision. SLA-hours resolution belongs to `rules/rules.yaml` —
 a human transcribes it from the interview as part of the later rules-engine
 plan, and the decision pipeline consults that file directly, citing the same
 transcript line. Ingestion's job here is only to make the interview
-line citable via `text_units`, which §7.9 already does.
+line citable via `text_units`, which §7.9 already does. See
+`03-decision-pipeline.md` §6, rule `R04_SHAKTI_SLA_36H`, for where this is
+actually transcribed and consulted.
 
 **Within `fleet_master`, for the 18 duplicate pairs**, the tie-break order is:
 
@@ -893,6 +896,7 @@ resolved by normalisation — do not record them as conflicts.)
 
 ## 11. What ingestion owes the query interface
 
+See `02-query-interface.md` for how these obligations are actually consumed.
 Part A requires one query interface that **returns answers with citations to
 source records and says plainly when the data is insufficient**, with negative
 marks for confident unsupported answers. Ingestion cannot build that interface,

@@ -5,9 +5,11 @@
   "type": "module",
   "engines": { "bun": ">=1.1.0" },
   "scripts": {
-    "cli": "bun run src/cli.ts",
+    "start": "bun run ingest && bun run pipeline && bun run approve",
     "ingest": "bun run src/run-ingest.ts",
-    "verify": "bun run src/cli.ts verify",
+    "pipeline": "bun run src/run-pipeline.ts",
+    "pipeline:clean": "rm -f state/actions.db state/actions.db-wal state/actions.db-shm && bun run src/run-pipeline.ts",
+    "approve": "bun run src/run-approve.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

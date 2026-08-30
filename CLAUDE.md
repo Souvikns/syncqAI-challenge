@@ -1,7 +1,8 @@
 # Meridian Dispatch — project instructions
 
 Breakdown-to-resolution automation for Meridian Freight. Files in, files out.
-No web app, no chatbot, no server. One command runs the whole system.
+No web app, no chatbot, no server. One command runs the whole system:
+`bun run start` (`ingest && pipeline && approve`).
 
 ## Stack (fixed — do not substitute)
 
@@ -44,11 +45,20 @@ The pipeline reads `context.db` and writes `actions.db`. Never the reverse.
 
 ## Plans
 
-- `.claude/plans/01-ingestion-pipeline.md` — the ingestion spec. Implement it
-  stage by stage, with tests, in the order given at the end of that file.
+- `.claude/plans/01-ingestion-pipeline.md` — the ingestion spec. Implemented.
+  Source bytes to a queryable `context.db`.
+- `.claude/plans/02-query-interface.md` — Part A's query interface. Not yet
+  built. Reads `context.db` only, never writes it. Depends on 01's §11
+  obligations (`cite()`, `UNKNOWN` preservation, the `conflicts` ledger).
+- `.claude/plans/03-decision-pipeline.md` — Part B: the breakdown-to-resolution
+  automation. Implemented (Steps 1-7, `bun run pipeline` / `bun run approve`).
+  Reads `context.db`, writes `actions.db` and `outputs/*.jsonl` +
+  `audit/audit.jsonl`. Depends on 01 (`context.db`, `cite()`) and shares
+  ticket-parsing logic with it (see 03 §4) but is otherwise independent of 02.
 
-Do not invent scope beyond the active plan. If the spec is ambiguous, add a
-`SPEC-GAP:` comment and surface it rather than guessing.
+Implement each plan stage by stage, with tests, in the order given at the end
+of that plan's file. Do not invent scope beyond the active plan. If a spec is
+ambiguous, add a `SPEC-GAP:` comment and surface it rather than guessing.
 
 ## NOTES
 

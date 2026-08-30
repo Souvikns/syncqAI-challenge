@@ -1,0 +1,130 @@
+# Transcribed by hand from dispatcher_interview.txt (Rajender Pal Yadav,
+# Senior Dispatch Manager, 14 years at Meridian). Every rule cites the exact
+# paragraph it came from - see 01-ingestion-pipeline.md and
+# ingestion/interview.ts for the blank-line paragraph numbering this matches.
+# See .claude/plans/03-decision-pipeline.md §6 for the full table and for
+# which rules are not computable on the delivered data, and why.
+
+rules:
+  - id: R01_BS4_WINTER_NCR_BAN
+    category: eligibility
+    citation: { source_id: interview, locator: "para:6" }
+    statement: >
+      October to February, no BS4 vehicle on any route touching Delhi,
+      Gurgaon, Faridabad or Noida. BS6 only.
+    months: [10, 11, 12, 1, 2]
+    hubs: [delhi, gurgaon, faridabad, noida]
+    requires_bs_stage: BS6
+
+  - id: R02_HILL_HEATER
+    category: eligibility
+    citation: { source_id: interview, locator: "para:8" }
+    statement: >
+      November to February, hill routes (Rudrapur and the Nainital
+      direction) require an engine heater.
+    months: [11, 12, 1, 2]
+    hubs: [rudrapur]
+    requires_heater: true
+
+  - id: R03_HILL_BRAKE_COOLDOWN
+    category: eligibility
+    citation: { source_id: interview, locator: "para:8" }
+    statement: >
+      November to February, hill routes require no brake work in the last
+      thirty days.
+    months: [11, 12, 1, 2]
+    hubs: [rudrapur]
+    brake_cooldown_days: 30
+
+  - id: R04_SHAKTI_SLA_36H
+    category: sla
+    citation: { source_id: interview, locator: "para:10" }
+    statement: >
+      Shakti Cement's effective SLA is 36 hours, not the contractual 48.
+    client: shakti_cement
+    sla_hours: 36
+
+  - id: R05_VERTEX_LUDHIANA_CUTOFF
+    category: comms
+    citation: { source_id: interview, locator: "para:11" }
+    statement: >
+      Vertex Retail deliveries to Ludhiana after 18:00 IST are held and
+      redelivered at 08:00 the next morning - never described as a failed
+      delivery, always a scheduled morning delivery.
+    client: vertex_retail
+    destination_hub: ludhiana
+    cutoff_hour: 18
+    resume_hour: 8
+
+  - id: R06_APEX_ROTATION
+    category: rotation
+    citation: { source_id: interview, locator: "para:12" }
+    statement: >
+      A vehicle that had an issue on an Apex Chemicals run is not
+      reassigned to Apex on its very next dispatch. Rotate a different
+      vehicle in at least once between.
+    client: apex_chemicals
+
+  - id: R07_ORION_VEHICLE_AGE
+    category: eligibility
+    citation: { source_id: interview, locator: "para:13" }
+    statement: >
+      Orion Pharma dispatches require a vehicle from 2020 or later, and
+      never an unrefrigerated overnight hold at a hub.
+    client: orion_pharma
+    min_year: 2020
+
+  - id: R08_MONSOON_ETA_PADDING
+    category: comms
+    citation: { source_id: interview, locator: "para:15" }
+    statement: >
+      July to September, destinations east of Lucknow get an ETA/SLA
+      padded by at least 20%; never promise the standard SLA on those
+      routes in that window.
+    months: [7, 8, 9]
+    # Structurally correct, but no hub in the current 9-hub vocabulary is
+    # east of Lucknow - see 03-decision-pipeline.md §2. Left empty on
+    # purpose rather than populated with a hub that isn't actually east of
+    # Lucknow just to make the list look non-empty.
+    hubs: []
+    padding_percent: 20
+
+  - id: R09_HUB_SELECTION
+    category: dispatch
+    citation: { source_id: interview, locator: "para:17" }
+    statement: >
+      Within 50km of the origin hub, the replacement always comes from the
+      origin hub - never "nearest hub", even if a nearer hub has one.
+      Beyond 50km, nearest hub with an eligible vehicle - not computable on
+      the delivered data, since no hub-to-hub distance data exists in the
+      bundle.
+    km_threshold: 50
+
+  - id: R10_GROUNDED_OVERDUE_SERVICE
+    category: eligibility
+    citation: { source_id: interview, locator: "para:18" }
+    statement: >
+      A vehicle more than 30 days past its due service date is grounded and
+      never eligible, no exceptions. Not computable on the delivered data:
+      vehicle_state.grounded is UNKNOWN for every vehicle (no service-due
+      date exists anywhere in the bundle - see 01-ingestion-pipeline.md §8.5).
+    overdue_days: 30
+
+  - id: R11_JUGAAD_7DAY_HOME_REGION
+    category: eligibility
+    citation: { source_id: interview, locator: "para:20" }
+    statement: >
+      A vehicle patched with a temporary fix ("jugaad") may not leave its
+      home hub region until seven days pass or a permanent repair is
+      logged.
+    home_region_days: 7
+
+  - id: R12_NEW_DRIVER_NIGHT_SOLO
+    category: classification
+    citation: { source_id: interview, locator: "para:22" }
+    statement: >
+      A driver with less than six months' tenure should not run solo at
+      night; pair them or schedule a day dispatch. Flagged for the human
+      approver, does not block vehicle selection.
+    tenure_threshold_days: 182
+    night_window: { start_hour: 20, end_hour: 6 }
